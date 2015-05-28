@@ -15,3 +15,6 @@ All features of NamelessMC are explained on the [features page](https://github.c
 * [Issue Tracker](https://github.com/samerton/NamelessMC/issues)
 * [Support](http://www.spigotmc.org/threads/nameless-minecraft-website-software.34810/)
 * [Download](https://github.com/samerton/NamelessMC/archive/master.zip) 
+
+# Modifiactions.
+  * Sending mail through PHPMailer class.
