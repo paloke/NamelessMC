@@ -5,6 +5,8 @@
  *
  *  License: MIT
  */
+ 
+ require ('inc/classes/class.phpmailer.php');	// Send mail via gmail.
 
 if($user->isLoggedIn()) { // User must be logged out to view this page
 	Redirect::to("/");
@@ -20,25 +22,52 @@ if(Input::exists()) {
 		if(count($check)){
 			$code = substr(str_shuffle("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 60);
 			
-			$to      = $check[0]->email;
-			$subject = 'Password Reset';
-			$message = 'Hello, ' . htmlspecialchars($check[0]->username) . '
+			// Load SMTP values 
+			date_default_timezone_set('Europe/Madrid');	// Timezone
 
-						You are receiving this email because you requested a password reset.
+			$mail = new PHPMailer(true); 			// New instance, with exceptions enabled
+			$mail->IsSMTP();                           	// We use the SMTP method of the class PHPMailer
+			$mail->SMTPDebug = 0;				// 0-wwithout debug, 1-Client debug 2-Client and server debug.
 
-						In order to reset your password, please use the following link:
-						http://' . $_SERVER['SERVER_NAME'] . '/change_password/?c=' . $code . '
-						
-						If you did not request the password reset, please contact us at ' . htmlspecialchars($siteemail) . '
-						Please note that your account will not be accessible until this action is complete.
-						
-						Thanks,
-						' . $sitename . ' staff.';
-			$headers = 'From: ' . $siteemail . "\r\n" .
-				'Reply-To: ' . $siteemail . "\r\n" .
-				'X-Mailer: PHP/' . phpversion();
+			$mail->Debugoutput = 'html';			// Errors dislplayed in HTML
+			$mail->CharSet = 'UTF-8';			// (DB UTF-8 > Email UTF-8)
+			$mail->XMailer = ' ';				// Removes the X-Mailer header 
 
-			mail($to, $subject, $message, $headers);
+			$mail->SMTPAuth = true				// enable SMTP authentication (Required for GMAIL)
+			$mail->Host = "ssl://smtp.gmail.com";		// SMTP server
+			$mail->Port = 465;				// SMTP server port (GMAIL)
+
+			$mail->Username = "USER@gmail.com";		// SMTP server User
+			$mail->Password = "password";			// SMTP server password
+
+			// Load message vaules
+
+			$to= $check[0]->email;
+			$username =  htmlspecialchars($check[0]->username);
+			$srv_address = $_SERVER['SERVER_NAME'];
+
+			$mail->AddReplyTo($siteemail,$sitename);		// Where the answers to be sent.
+			$mail->From = $siteemail; 				// Mail Sender
+			$mail->FromName = $sitename;				// Sender name.
+			$mail->AddAddress($to, $newuser); 			// Destination.
+			$mail->Subject  = 'Password Reset ' . $sitename . '!';	// Subject.
+
+			// Load mail template
+			$HTML_file = file_get_contents('forgot_password.html', dirname(__FILE__));
+			//Replaces the document data.
+			$marcadores = array("%USER_NAME%", "%USER_MAIL%", "%USER_VALIDATE%", "%SRV_NAME%", "%SRV_ADDRESS%", "%SRV_MAIL%");
+			$resultados = array($username, $to, $code, $sitename, $srv_address, $siteemail );
+	
+			$HTML_msg = str_ireplace($marcadores, $resultados, $HTML_file);
+
+			$mail->MsgHTML($HTML_msg);
+			$mail->AddEmbeddedImage(dirname(__FILE__).'/img/logo.jpg', 'mail-logo', '$sitename');
+
+			// Add custom fileds to mail head
+			$mail->addCustomHeader("SRV: 01");
+
+			$mail->IsHTML(true);
+			$mail->Send();
 			
 			$queries->update('users', $check[0]->id, array(
 				'reset_code' => $code,
