@@ -10,6 +10,8 @@ require('inc/includes/password.php'); // Include the password compatibility func
 require('inc/includes/html/library/HTMLPurifier.auto.php'); // For T & Cs
 require('inc/integration/uuid.php'); // For UUID stuff
 
+require ('inc/classes/class.phpmailer.php');	// Send mail via gmail.
+
 // Redirect if logged in
 if($user->isLoggedIn()){
 	Redirect::to("../");
@@ -120,28 +122,53 @@ if(Input::exists()) {
 					'lastip' => htmlspecialchars($ip)
 				));
 
-				$siteemail = $queries->getWhere("settings", array("name", "=", "outgoing_email"));
-				$siteemail = $siteemail[0]->value;
-				
-				$to      = Input::get('email');
-				$subject = 'Welcome to ' . $sitename . '!';
-				$message = 'Hello, ' . htmlspecialchars(Input::get('username')) . '
+				// Load SMTP values 
+				date_default_timezone_set('Europe/Madrid');	// Timezone
 
-							Thanks for registering!
+				$mail = new PHPMailer(true); 			// New instance, with exceptions enabled
+				$mail->IsSMTP();                           	// We use the SMTP method of the class PHPMailer
+				$mail->SMTPDebug = 0;				// 0-wwithout debug, 1-Client debug 2-Client and server debug.
 
-							In order to complete your registration, please click the following link:
-							http://' . $_SERVER['SERVER_NAME'] . '/validate/?c=' . $code . '
+				$mail->Debugoutput = 'html';			// Errors dislplayed in HTML
+				$mail->CharSet = 'UTF-8';			// (DB UTF-8 > Email UTF-8)
+				$mail->XMailer = ' ';				// Removes the X-Mailer header 
 
-							Please note that your account will not be accessible until this action is complete.
-							
-							Thanks,
-							' . $sitename . ' staff.';
-				$headers = 'From: ' . $siteemail . "\r\n" .
-					'Reply-To: ' . $siteemail . "\r\n" .
-					'X-Mailer: PHP/' . phpversion();
+				$mail->SMTPAuth = true				// enable SMTP authentication (Required for GMAIL)
+				$mail->Host = "ssl://smtp.gmail.com";		// SMTP server
+				$mail->Port = 465;				// SMTP server port (GMAIL)
 
-				mail($to, $subject, $message, $headers);
-				
+				$mail->Username = "USER@gmail.com";		// SMTP server User
+				$mail->Password = "password";			// SMTP server password
+
+				// Load message vaules
+
+				$to= $check[0]->email;
+				$username =  htmlspecialchars($check[0]->username);
+				$srv_address = $_SERVER['SERVER_NAME'];
+
+				$mail->AddReplyTo($siteemail,$sitename);		// Where the answers to be sent.
+				$mail->From = $siteemail; 				// Mail Sender
+				$mail->FromName = $sitename;				// Sender name.
+				$mail->AddAddress($to, $newuser); 			// Destination.
+				$mail->Subject  = 'Welcome to ' . $sitename . '!';	// Subject.
+
+				// Load mail template
+				$HTML_file = file_get_contents('register.html', dirname(__FILE__));
+				//Replaces the document data.
+				$marcadores = array("%USER_NAME%", "%USER_MAIL%", "%USER_VALIDATE%", "%SRV_NAME%", "%SRV_ADDRESS%", "%SRV_MAIL%");
+				$resultados = array($username, $to, $code, $sitename, $srv_address, $siteemail );
+	
+				$HTML_msg = str_ireplace($marcadores, $resultados, $HTML_file);
+
+				$mail->MsgHTML($HTML_msg);
+				$mail->AddEmbeddedImage(dirname(__FILE__).'/img/logo.jpg', 'mail-logo', '$sitename');
+
+				// Add custom fileds to mail head
+				$mail->addCustomHeader("SRV: 01");
+
+				$mail->IsHTML(true);
+				$mail->Send();
+
 				Session::flash('home', '<div class="alert alert-info alert-dismissible">  <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button>Please check your emails for a validation link. You won\'t be able to log in until this is clicked.</div>');
 				Redirect::to('../');
 				die();
